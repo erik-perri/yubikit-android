@@ -183,6 +183,11 @@ public class YubiOtpSession extends ApplicationSession<YubiOtpSession> {
 
             @Override
             byte[] sendAndReceive(byte slot, byte[] data, int expectedResponseLength, @Nullable CommandState state) throws IOException, CommandException {
+                return sendAndReceive(slot, data, expectedResponseLength, state, true);
+            }
+
+            @Override
+            byte[] sendAndReceive(byte slot, byte[] data, int expectedResponseLength, @Nullable CommandState state, boolean mayBlock) throws IOException, CommandException {
                 byte[] response = delegate.sendAndReceive(new Apdu(0, INS_CONFIG, slot, 0, data));
                 if (expectedResponseLength != response.length) {
                     throw new BadResponseException("Unexpected response length");
@@ -210,7 +215,12 @@ public class YubiOtpSession extends ApplicationSession<YubiOtpSession> {
 
             @Override
             byte[] sendAndReceive(byte slot, byte[] data, int expectedResponseLength, @Nullable CommandState state) throws IOException, CommandException {
-                byte[] response = delegate.sendAndReceive(slot, data, state);
+                return sendAndReceive(slot, data, expectedResponseLength, state, true);
+            }
+
+            @Override
+            byte[] sendAndReceive(byte slot, byte[] data, int expectedResponseLength, @Nullable CommandState state, boolean mayBlock) throws IOException, CommandException {
+                byte[] response = delegate.sendAndReceive(slot, data, state, mayBlock);
                 if (ChecksumUtils.checkCrc(response, expectedResponseLength + 2)) {
                     return Arrays.copyOf(response, expectedResponseLength);
                 }
@@ -368,6 +378,10 @@ public class YubiOtpSession extends ApplicationSession<YubiOtpSession> {
      * @throws CommandException in case of an error response from the YubiKey
      */
     public byte[] calculateHmacSha1(Slot slot, byte[] challenge, @Nullable CommandState state) throws IOException, CommandException {
+        return calculateHmacSha1(slot, challenge, state, true);
+    }
+
+    public byte[] calculateHmacSha1(Slot slot, byte[] challenge, @Nullable CommandState state, boolean mayBlock) throws IOException, CommandException {
         require(FEATURE_CHALLENGE_RESPONSE);
 
         // Pad challenge with byte different from last.
@@ -380,7 +394,8 @@ public class YubiOtpSession extends ApplicationSession<YubiOtpSession> {
                 slot.map(CMD_CHALLENGE_HMAC_1, CMD_CHALLENGE_HMAC_2),
                 padded,
                 HMAC_RESPONSE_SIZE,
-                state
+                state,
+                mayBlock
         );
     }
 
@@ -473,7 +488,20 @@ public class YubiOtpSession extends ApplicationSession<YubiOtpSession> {
 
         abstract void writeToSlot(byte slot, byte[] data) throws IOException, CommandException;
 
-        abstract byte[] sendAndReceive(byte slot, byte[] data, int expectedResponseLength, @Nullable CommandState state) throws IOException, CommandException;
+        abstract byte[] sendAndReceive(
+                byte slot,
+                byte[] data,
+                int expectedResponseLength,
+                @Nullable CommandState state
+        ) throws IOException, CommandException;
+
+        abstract byte[] sendAndReceive(
+                byte slot,
+                byte[] data,
+                int expectedResponseLength,
+                @Nullable CommandState state,
+                boolean mayBlock
+        ) throws IOException, CommandException;
 
         @Override
         public void close() throws IOException {

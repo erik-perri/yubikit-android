@@ -20,6 +20,7 @@ import com.yubico.yubikit.core.Version;
 import com.yubico.yubikit.core.application.CommandException;
 import com.yubico.yubikit.core.application.CommandState;
 import com.yubico.yubikit.core.application.TimeoutException;
+import com.yubico.yubikit.core.application.WouldBlockException;
 import com.yubico.yubikit.core.util.StringUtils;
 
 import java.io.ByteArrayOutputStream;
@@ -92,6 +93,10 @@ public class OtpProtocol implements Closeable {
      * @throws CommandException in case the command failed
      */
     public byte[] sendAndReceive(byte slot, @Nullable byte[] data, @Nullable CommandState state) throws IOException, CommandException {
+        return sendAndReceive(slot, data, state, true);
+    }
+
+    public byte[] sendAndReceive(byte slot, @Nullable byte[] data, @Nullable CommandState state, boolean mayBlock) throws IOException, CommandException {
         byte[] payload;
         if (data == null) {
             payload = new byte[SLOT_DATA_SIZE];
@@ -100,7 +105,7 @@ public class OtpProtocol implements Closeable {
         } else {
             payload = Arrays.copyOf(data, SLOT_DATA_SIZE);
         }
-        return readFrame(sendFrame(slot, payload), state != null ? state : defaultState);
+        return readFrame(sendFrame(slot, payload), state != null ? state : defaultState, mayBlock);
     }
 
     /**
@@ -187,7 +192,7 @@ public class OtpProtocol implements Closeable {
     }
 
     /* Reads one frame */
-    private byte[] readFrame(int programmingSequence, CommandState state) throws IOException, CommandException {
+    private byte[] readFrame(int programmingSequence, CommandState state, boolean mayBlock) throws IOException, CommandException {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         byte seq = 0;
         boolean needsTouch = false;
@@ -225,6 +230,9 @@ public class OtpProtocol implements Closeable {
             } else { // Need to wait
                 long timeout;
                 if ((statusByte & RESP_TIMEOUT_WAIT_FLAG) != 0) {
+                    if (!mayBlock) {
+                        throw new WouldBlockException("Command would block");
+                    }
                     state.onKeepAliveStatus(CommandState.STATUS_UPNEEDED);
                     needsTouch = true;
                     timeout = 100;
