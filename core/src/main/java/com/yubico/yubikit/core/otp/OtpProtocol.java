@@ -231,6 +231,7 @@ public class OtpProtocol implements Closeable {
                 long timeout;
                 if ((statusByte & RESP_TIMEOUT_WAIT_FLAG) != 0) {
                     if (!mayBlock) {
+                        resetState();
                         throw new WouldBlockException("Command would block");
                     }
                     state.onKeepAliveStatus(CommandState.STATUS_UPNEEDED);
